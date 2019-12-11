@@ -21,6 +21,8 @@ import audioGen # to create audio files
 
 # import pyttsx3
 
+import serial
+
 q = Queue() # a mouse movement listener
 c = Queue() # a click listener
 
@@ -61,7 +63,7 @@ def isObject(x, y, img):
     """
     Read the pixel BGR value for the pointers current location
     """
-    print(x, y, "  and color: ", img[x,y])
+    # print(x, y, "  and color: ", img[x,y])
     return img[x,y]
 
 screenDims = (800, 1280) # the dimensions of my laptop screen
@@ -148,6 +150,9 @@ imgDetails = {
     "colHeights": col_heights
     }
 
+# ## if communicating with Arduino, open serial communication
+ser = serial.Serial('/dev/cu.usbmodem14201', 9600) # Establish the connection on a specific port
+
 while(True):
     # generate a new matrix
     img = np.zeros(imgDims, np.uint8)
@@ -163,6 +168,24 @@ while(True):
     ## Note: mouse values are switched compared to scale x,y vals to switched back for calculation
     newCircleLoc = (int(newLocVal[0]*scaleFactor[1]), int(newLocVal[1]*scaleFactor[0]))
 
+    # If the current point is not black then send a vibration signal to the arduino through pyserial
+    curColor = isObject(newCircleLoc[1], newCircleLoc[0], img)
+    if (np.array_equal(curColor, [255,0,0])):
+        print("This area is not targetColor: ", newCircleLoc) 
+
+        # send a 1 to the arduino via signal connection
+        ser.write(str.encode(str(1))) # Convert the decimal number to ASCII then send it to the Arduino
+        print(ser.readline()) # Read the newest output from the Arduino
+    # elif np.array_equal(curColor, [255,0,0]):
+    #     # send a 0 to the arduino via signal connection
+    #     ser.write(str.encode(str(0))) # Convert the decimal number to ASCII then send it to the Arduino
+    #     print(ser.readline()) # Read the newest output from the Arduino
+        
+    else:
+        # send a 0 to the arduino via signal connection
+        ser.write(str.encode(str(0))) # Convert the decimal number to ASCII then send it to the Arduino
+        print(ser.readline()) # Read the newest output from the Arduino
+
     # if the mouse is clicked then print return and exit.
     while not c.empty():
         mouseClicked = c.get()
@@ -173,7 +196,8 @@ while(True):
         # get the colors associated label
         mouseColor = findColorKey(imgDetails, currentMColor)
         if mouseColor is not False:
-            sayLabel(mouseColor)
+            pass
+            # sayLabel(mouseColor)
 
             # engine.say(mouseColor)
             # engine.runAndWait()
@@ -186,11 +210,11 @@ while(True):
     cv2.imshow("imgWindow", img)
     cv2.moveWindow("imgWindow", 400, 50)
 
-    k = cv2.waitKey(100) & 0xFF
+    k = cv2.waitKey(10) & 0xFF
     if k == ord('q'):
         print("q pressed. Exiting..")
-        # cv2.destroyAllWindows()
-        # exit()
+        cv2.destroyAllWindows()
+        exit()
 
 
 
