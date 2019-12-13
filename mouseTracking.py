@@ -10,6 +10,9 @@
 
 """
 
+# constant flags 
+SERIAL = True
+
 import cv2
 import numpy as np
 
@@ -63,14 +66,21 @@ def isObject(x, y, img):
     """
     Read the pixel BGR value for the pointers current location
     """
-    # print(x, y, "  and color: ", img[x,y])
-    return img[x,y]
+    try:
+        return img[x,y]
+    except:
+        print("Exception: mouse outside of screen")        
+        return 
 
 screenDims = (800, 1280) # the dimensions of my laptop screen
-imgDims = (500, 640, 3) # the dimensions of the opencv window (y, x, channels)
+border = 20 # border depth if there is one
+borderColor = (5,100,100)
+windowDims = (500, 640, 3)
+imgDims = (windowDims[0]-(border*2), windowDims[1]-(border*2), 3) # the dimensions of the opencv window (y, x, channels), incorpating any border dims
+
 
 # scaleFactor = (0.4, 0.64) # the scaling factors to convert the screen location to opencv window location
-scaleFactor = (imgDims[0]/screenDims[0], imgDims[1]/screenDims[1]) # the scaling factors to convert the screen location to opencv window location
+scaleFactor = ((windowDims[0]+(border*2))/screenDims[0], (windowDims[1]+(border*2))/screenDims[1]) # the scaling factors to convert the screen location to opencv window location
 
 def drawMyCircle(imgCpy, circleLoc):
     """
@@ -109,7 +119,10 @@ def findColorKey(imgDets, color):
 
     return False
 
-def drawMyBarChart(imgCpy, imgDets):
+def draw_border(img, border):
+    return cv2.copyMakeBorder(img, border, border, border, border, cv2.BORDER_CONSTANT, value=borderColor)
+
+def drawMyBarChart(imgCpy, imgDets, border):
     """
     draw randomly generated vertical coloumns
     """
@@ -118,10 +131,10 @@ def drawMyBarChart(imgCpy, imgDets):
     imgXSize= imgCpy.shape[1]
     gapBetweenCols = 30
     numCols = len(imgDets["colHeights"]) # find the number of cols
-    colWidth = int( (imgXSize-((numCols+1)*gapBetweenCols))/numCols ) # calculate the column width based on the number of cols etc
+    colWidth = int( (imgXSize-((numCols+1)*gapBetweenCols)-(border*2))/numCols ) # calculate the column width based on the number of cols etc
     recStroke = -1   
 
-    cntX = gapBetweenCols
+    cntX = gapBetweenCols + border # set the starting x point
 
     # Create a list of the bar colors
     colorList = list(imgDets["barDetails"].values())
@@ -130,7 +143,7 @@ def drawMyBarChart(imgCpy, imgDets):
     for i in range(len(imgDets["colHeights"])):
         recTopLeft = (cntX, imgDets["colHeights"][i]) # (x, y)
         cntX+=colWidth
-        recBotRight = (cntX, imgCpy.shape[0])
+        recBotRight = (cntX, imgCpy.shape[0]-border-1)
         cv2.rectangle(imgCpy, recTopLeft, recBotRight, colorList[i], recStroke)
         cntX +=gapBetweenCols
 
@@ -142,7 +155,7 @@ col_heights = []
 
 # generate a list of random column heights (within the image height)
 for e in range(len(barDetails)):
-    col_heights.append(random.randint(1, imgDims[0]))
+    col_heights.append(random.randint(border, imgDims[0]))
 
 # dictionary holding column values
 imgDetails = {
@@ -150,15 +163,17 @@ imgDetails = {
     "colHeights": col_heights
     }
 
-# ## if communicating with Arduino, open serial communication
-ser = serial.Serial('/dev/cu.usbmodem14201', 9600) # Establish the connection on a specific port
+if SERIAL:
+    ## if communicating with Arduino, open serial communication
+    ser = serial.Serial('/dev/cu.usbmodem14101', 9600) # Establish the connection on a specific port
 
 while(True):
     # generate a new matrix
-    img = np.zeros(imgDims, np.uint8)
+    rawImg = np.zeros(windowDims, np.uint8)
+    img = draw_border(rawImg, border)
 
     # draw the graphic(bar chart) being explored in this program to the new matrix
-    drawMyBarChart(img, imgDetails)
+    drawMyBarChart(img, imgDetails, border)
 
     # get the current mouse location from the other thread(and cycle through until only the most current is left)
     while not q.empty():
@@ -171,20 +186,26 @@ while(True):
     # If the current point is not black then send a vibration signal to the arduino through pyserial
     curColor = isObject(newCircleLoc[1], newCircleLoc[0], img)
     if (np.array_equal(curColor, [255,0,0])):
-        print("This area is not targetColor: ", newCircleLoc) 
+        print("Target1 area: ", newCircleLoc) 
 
-        # send a 1 to the arduino via signal connection
-        ser.write(str.encode(str(1))) # Convert the decimal number to ASCII then send it to the Arduino
-        print(ser.readline()) # Read the newest output from the Arduino
-    # elif np.array_equal(curColor, [255,0,0]):
-    #     # send a 0 to the arduino via signal connection
-    #     ser.write(str.encode(str(0))) # Convert the decimal number to ASCII then send it to the Arduino
-    #     print(ser.readline()) # Read the newest output from the Arduino
-        
+        if SERIAL:
+            # send a 1 to the arduino via signal connection
+            ser.write(str.encode(str(2))) # Convert the decimal number to ASCII then send it to the Arduino
+            print(ser.readline()) # Read the newest output from the Arduino
+
+    elif(np.array_equal(curColor, list(borderColor))):
+        print("This is border color: ", borderColor, " and curColor: ", curColor)
+
+        if SERIAL:
+            # send a 1 to the arduino via signal connection
+            ser.write(str.encode(str(1))) # Convert the decimal number to ASCII then send it to the Arduino
+            print(ser.readline()) # Read the newest output from the Arduino
+
     else:
-        # send a 0 to the arduino via signal connection
-        ser.write(str.encode(str(0))) # Convert the decimal number to ASCII then send it to the Arduino
-        print(ser.readline()) # Read the newest output from the Arduino
+        if SERIAL:
+            # send a 0 to the arduino via signal connection
+            ser.write(str.encode(str(0))) # Convert the decimal number to ASCII then send it to the Arduino
+            print(ser.readline()) # Read the newest output from the Arduino
 
     # if the mouse is clicked then print return and exit.
     while not c.empty():
