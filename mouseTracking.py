@@ -29,6 +29,9 @@ import serial
 q = Queue() # a mouse movement listener
 c = Queue() # a click listener
 
+import os # for audio generation and playing
+
+
 def on_move(x, y):
     """
     on mouse movement execute this
@@ -41,8 +44,9 @@ def on_click(x, y, button, pressed):
     on mouse click execute this
     """
     # print('{0} at {1}'.format('Pressed' if pressed else 'Released',(x, y)))
-    c.put(True)
-
+    if pressed:
+        c.put(True)
+    
 # listen asynchronously to the mouse location
 listener = Listener(
     on_move = on_move,
@@ -51,16 +55,10 @@ listener = Listener(
     )
 listener.start()
 
-# engine = pyttsx3.init()
-# # set the engine property to 400 (originally 200)
-# rate = engine.getProperty('rate')   # getting details of current speaking rate
-# engine.setProperty('rate', 400)     # setting up new voice rate
-
-def sayLabel(name, engine):
-    pass
+def sayLabel(name, myaudio):
     # say whatever text is sent to it
-
-    # engine.stop()
+    print("this is the name: ", myaudio[name])
+    audioGen.play_audio(myaudio[name])
 
 def isObject(x, y, img):
     """
@@ -157,6 +155,12 @@ col_heights = []
 for e in range(len(barDetails)):
     col_heights.append(random.randint(border, imgDims[0]))
 
+# create audio clips for each category and save in a dictionary
+myaudio={}
+for i in barDetails:
+    audSaveDir = os.path.join(os.getcwd(), "audioFiles")
+    myaudio.update(audioGen.create_audio_files([i], audSaveDir))
+
 # dictionary holding column values
 imgDetails = {
     "barDetails": barDetails,
@@ -217,14 +221,10 @@ while(True):
         # get the colors associated label
         mouseColor = findColorKey(imgDetails, currentMColor)
         if mouseColor is not False:
-            pass
-            # sayLabel(mouseColor)
+            sayLabel(mouseColor, myaudio)
+            print("this is the mousecolor: ", mouseColor)
 
-            # engine.say(mouseColor)
-            # engine.runAndWait()
-            # print("This is mouseColor")
-
-
+    print("outside")
     # if not newCircleLoc[0]>imgDims[0] or newCircleLoc[1]>imgDims[1]:
     drawMyCircle(img, newCircleLoc)
 
