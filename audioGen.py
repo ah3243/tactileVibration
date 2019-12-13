@@ -142,6 +142,11 @@ from gtts import gTTS
 import os
 
 def create_audio_files(itemText, saveDir):
+    """
+    Eg. 
+    create_audio_files([lion, buffalo], "audioFiles")
+    """
+
     fPaths = {}
     for i in itemText:
         # remove any whitespace and save in the audiofiles folder 
